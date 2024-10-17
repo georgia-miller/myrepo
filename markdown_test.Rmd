@@ -1,7 +1,8 @@
 ---
 title: "Test for Markdown"
-output: html_document
+author: "Georgia Miller"
 date: "2024-10-17"
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
