@@ -1,0 +1,24 @@
+---
+title: "seurat_tutorial"
+author: "Georgia Miller"
+date: "2024-10-24"
+output: github_document 
+---
+
+This is following the Seurat tutorial from https://satijalab.org/seurat/articles/pbmc3k_tutorial
+
+This is to analysing a dataset of Peripheral Blood Mononuclear Cells (PBMCs) available from 10X genomics. 2,700 single cells were sequenced on Illumina NextSeq500.
+
+```{r}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+```
+Read10X reads in output of the cellranger pipeline form 10X, returns Unique Molecular Identified (UMI) count matrix. Values in matrix represents number of molecules for each feature (gene, row) detected in each cell (column). More recent versions use h5 file format, read in using Read10X_h5() function. 
+```{r}
+# load the PBMC dataset
+pbmc_data <- Read10X(data.dir = "/Users/k2477939/Documents/myrepo/seurat_tutorial/filtered_gene_bc_matrices/hg19/")
+
+
+```
+
