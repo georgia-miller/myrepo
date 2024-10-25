@@ -1,0 +1,27 @@
+{
+    "id": "01902AA2",
+    "path": "~/Documents/myrepo/seurat_tutorial/seurat_tutorial.Rmd",
+    "project_path": "seurat_tutorial.Rmd",
+    "type": "r_markdown",
+    "hash": "1103771750",
+    "contents": "",
+    "dirty": false,
+    "created": 1729765514413.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "161,17",
+        "scrollLine": "139",
+        "last_setup_crc32": ""
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1729847766,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1729847766046,
+    "read_only": false,
+    "read_only_alternatives": []
+}

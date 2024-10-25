@@ -1,0 +1,2 @@
+"0","# Load the PBMC dataset"
+"0","pbmc.data <- Read10X(data.dir = ""/Users/k2477939/Documents/myrepo/seurat_tutorial/filtered_gene_bc_matrices/hg19/"")"
