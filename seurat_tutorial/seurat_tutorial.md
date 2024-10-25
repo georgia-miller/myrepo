@@ -5,7 +5,7 @@ Georgia Miller
 
 ## This is following the Seurat tutorial from <https://satijalab.org/seurat/articles/pbmc3k_tutorial>
 
-This is to analysing a dataset of Peripheral Blood Mononuclear Cells
+This is to analyse a dataset of Peripheral Blood Mononuclear Cells
 (PBMCs) available from 10X genomics. 2,700 single cells were sequenced
 on Illumina NextSeq500.
 
