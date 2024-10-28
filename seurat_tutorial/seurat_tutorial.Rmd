@@ -15,6 +15,7 @@ library(Seurat)
 library(patchwork)
 ```
 
+
 # Read in data
 Read10X reads in output of the cellranger pipeline form 10X, returns Unique Molecular Identified (UMI) count matrix. Values in matrix represents number of molecules for each feature (gene, row) detected in each cell (column). More recent versions use h5 file format, read in using Read10X_h5() function. 
 ```{r}
@@ -86,6 +87,7 @@ plot2 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "nFeature_RNA"
 plot1 + plot2
 ```
 
+
 ## Filter cells
 Filter cells based on QC metrics e.g. here keep cells with 200-2,500 unique features and with <5% mitochondrial counts.
 ```{r}
@@ -101,6 +103,7 @@ By default, use a global-scaling normalisation method "LogNormalize" that normal
 pbmc <- NormalizeData(pbmc, normalization.method = "LogNormalize", scale.factor = 10000)
 ```
 Assumes each cell originally contains the same number of RNA molecules. Alternative workflows do not assume this e.g. SCTransform()
+
 
 # Feature selection
 
@@ -133,6 +136,8 @@ plot1 <- VariableFeaturePlot(pbmc)
 plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
 plot1 + plot2
 ```
+
+
 # Scaling
 
 Apply a linear transformation (scaling) is a standard pre-processing step to dimensionality reduction tehcnqiues
@@ -157,14 +162,199 @@ But, recommend SCTransform() for advanced users
 #pbmc <- ScaleData(pbmc, vars.to.regress = "percent.mt")
 ```
 
+
 # Linear dimensional reduction
 
 Perform PCA on scaled data. By default, use previously determined variable features but can define different subset using features (must pass through ScaleData first)
 
-For first PCs, outputs a list of genes with most positive and most negative loadings, representing modules of genes with correation or anti-correlation across scs
+For first PCs, outputs a list of genes with most positive and most negative loadings, representing modules of genes with correlation or anti-correlation across SCs
 
 ```{r}
 pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
+```
+Visualise both cells and features that define the PCA through VizDimReduction(), DimPlot() or DimHeatmap()
+
+```{r}
+print(pbmc[["pca"]], dims = 1:5, nfeatures = 5)
+
+VizDimLoadings(pbmc, dims = 1:2, reduction = "pca")
+
+DimPlot(pbmc, reduction = "pca") + NoLegend()
+```
+
+DimHeatMap() allows easy exploration of primary sources of heterogeneity ub a dataset, can be useful for deciding which PCs to include for downstream analyses. Cells and features are ordered according to PCA scores. Setting cells to a number plots the ‘extreme’ cells on both ends of the spectrum, which dramatically speeds plotting for large datasets. Though clearly a supervised analysis, we find this to be a valuable tool for exploring correlated feature sets.
+
+```{r}
+DimHeatmap(pbmc, dims = 1, cells = 500, balanced = TRUE)
+```
+
+```{r fig.width = 15, fig.height = 25}
+DimHeatmap(pbmc, dims = 1:15, cells = 500, balanced = TRUE)
+```
+
+
+# Determine the 'dimensionality' of the dataset
+
+Seurat clusters cells based on their PCA scores where each PC is a metafeature (combining info across a correlated feature set) to overcome extensive technical noise in any single feature.
+
+Heuristic method generates an elbow plot which ranks PCs based on percentage of variance explained by each PC. Look for where the "Elbow" is for how many PCs capture the majority of true signal (9-10 below)
+
+```{r}
+ElbowPlot(pbmc)
+```
+
+Identifying true dimensionality is challenging/uncertain.
+1) More supervised approach, exploring PCs to determine relevant sources of heterogeneity and could be used along with e.g. GSEA
+2) ElbowPlot
+3) Heuristic - common and instant.
+
+Also consider e.g.
+
+  * DC and NK experts may recognise genes strongly associated with PC 12 and 13 define rare immune subplot but groups are so rare it is difficult to distinguish from noise for this size dataset without prior knowledge
+  * Repeat downstream analyses with different PC numbers, often do not differ much
+  * err on higher side when choosing the parameter
+
+
+# Cluster the cells
+
+Graph-based clustering approach building upon strategies in Macosko et al. Distance metric which drives clustering anlaysis based on previously identified PCs remains the same. Approach to partitioning the cellular distance matrix into clusters has improved (cells embedded in graph structure e.g. K-nearest neighbours graph and try to partition into 'quasi-cliques' or 'communities'). 
+
+  * Construct KNN graph based on euclidean distance in CPA space and redefine edge weights between any two cells based on shared overlap in local neighbourhoods (Jaccard similarity)
+    + Input: previously defined dimensionality (first 10 PCs)
+    + FindNeighbours() function
+  * apply modularity optimisation tehcniques (Louvain algorithm by default or SLM) to iteratively group cells. Goal to optimise standard modularity function
+    + FindClusters() function
+    + resolution parameter sets 'granularity' of downstream clustering, higher number = more clusters. Set between 0.4-1.2 for datasets ~3k cells. Optimal resolution often increases for bigger datasets
+    + Look at clusters with Idents() function
+    
+```{r}
+pbmc <- FindNeighbors(pbmc, dims = 1:10)
+pbmc <- FindClusters(pbmc, resolution = 0.5)
+
+# look at cluster IDs of first 5 cells
+head(Idents(pbmc), 5)
+```
+
+# Non-linear dimensional reduction (UMAP/tSNE)
+
+Goal is to learn underlying structure in the dataset to place similar cells together in low-dimensional space. But, all visualisation techniques have limitations and cannot fully represent the complexity of the data. UMAP and tSNE aim to preserve local distances in the dataset but often do not preserve more global datasets. Good for visualisation but do not draw biological conclusions based on only visualisation.
+
+```{r}
+pbmc <- RunUMAP(pbmc, dims = 1:10)
+
+# can set label + TRUE or use LabelClsuters() to label individual clusters
+DimPlot(pbmc, reduction = "umap")
+```
+
+NB: Warning: The default method for RunUMAP has changed from calling Python UMAP via reticulate to the R-native UWOT using the cosine metric
+To use Python UMAP via reticulate, set umap.method to 'umap-learn' and metric to 'correlation'
+
+Can save so do not need to rerun computationally intensive steps and can share.
+```{r}
+saveRDS(pbmc, file = "output/pbmc_tutorial_umap.rds")
+```
+
+# Finding differentially expressed features (cluster biomarkers)
+
+Seurat cna help you find markers that define clusters via differential expression. 
+
+  * FindMarkers() by default it identifies positive and negative markers of a single cluster (ident.1 specifies) compared to all other cells
+  * FindAllMarkers() automates process for all clusters but can also test groups of clusters vs each other or agaisnt all cells.
+  * Use presto package in Seurat V5 to increase speed of DE analysis, espeically for big datasets. Otherwise can look at FindMarkers() documentation to explore min.pct and logfc.threshold, can increase to increase speed of DE testing.
+
+```{r}
+# find all markers of cluster 2
+cluster2.markers <- FindMarkers(pbmc, ident.1 = 2)
+head(cluster2.markers, n = 5)
+
+# find all markers distinguishing cluster 5 from clusters 0 and 3
+cluster5.markers <- FindMarkers(pbmc, ident.1 = 5, ident.2 = c(0,3) )
+head(cluster5.markers, n = 5)
+
+# find markers for every cluster compared to all remaining cells, report only positives
+pbmc.markers <- FindAllMarkers(pbmc, only.pos = TRUE)
+pbmc.markers %>% 
+  group_by(cluster) %>% 
+  dplyr::filter(avg_log2FC > 1)
+```
+
+Seurat has several tests for DE, can be set with test.use parameter e.g. ROC returns classification for any individual marker (0 = random, 1 = perfect)
+
+```{r}
+cluster0.markers <- FindMarkers(pbmc, ident.1 = 0, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+```
+
+Include tools for visualising marker expression
+
+  * VlnPlot() shows expression probability distributions across clusters
+  * FeaturePlot() shows feature expression on a tSNE or PCA plot
+  * RidgePlot()
+  * CellScatter()
+  * DotPlot()
+  
+```{r}
+VlnPlot(pbmc, features = c("MS4A1", "CD79A"))
+
+# or plot raw counts
+VlnPlot(pbmc, features = c("NKG7", "PF4"), slot = "counts", log = TRUE)
+```
+
+```{r fig.width = 15, fig.height = 20}
+FeaturePlot(pbmc, features = c("MS4A1", "GNLY", "CD3E", "CD14", "FCER1A", "FCGR3A", "LYZ", "PPBP", "CD8A"))
+```
+  
+  * DoHeatmap() generates expression heatmap for given cells and features e.g. top 20 markers for eac cluster
+  
+```{r fig.width = 15, fig.height = 20}
+pbmc.markers %>% 
+  group_by(cluster) %>% 
+  dplyr::filter(avg_log2FC > 1) %>% 
+  slice_head(n = 10) %>% 
+  ungroup() -> top10
+
+DoHeatmap(pbmc, features = top10$gene) + NoLegend()
+```
+  
+# Assign cell type identity to clusters
+  
+Cluster ID    Markers	            Cell Type
+0	            IL7R, CCR7	        Naive CD4+ T
+1	            CD14, LYZ	CD14+     Mono
+2	            IL7R, S100A4	      Memory CD4+
+3	            MS4A1	              B
+4	            CD8A	              CD8+ T
+5	            FCGR3A, MS4A7	      FCGR3A+ Mono
+6	            GNLY, NKG7	        NK
+7	            FCER1A, CST3	      DC
+8	            PPBP	              Platelet
+
+```{r}
+new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono", "NK", "DC", "Platelet")
+names(new.cluster.ids) <- levels(pbmc)
+pbmc <- RenameIdents(pbmc, new.cluster.ids)
+DimPlot(pbmc, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+```
+
+```{r}
+library(ggplot2)
+plot <- 
+  DimPlot(pbmc, reduction = "umap", label = TRUE, label.size = 4.5) +
+  xlab("UMAP 1") + 
+  ylab("UMAP 2") +
+  theme(axis.title = element_text(size = 18), legend.text = element_text(size = 18)) +
+  guides(colour = guide_legend(override.aes = list(size = 10)))
+
+plot 
+
+ggsave(filename = "output/pbmc3k_umap.jpg", height = 7, width = 12, plot = plot, quality = 50)
+
+saveRDS(pbmc, file = "output/pbmc3k_final.rds")
+  
+```
+
+## Session info
+```{r}
+sessionInfo()
 ```
 
 
