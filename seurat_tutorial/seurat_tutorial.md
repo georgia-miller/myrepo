@@ -512,7 +512,7 @@ saveRDS(pbmc, file = "output/pbmc_tutorial_umap.rds")
 
 # Finding differentially expressed features (cluster biomarkers)
 
-Seurat cna help you find markers that define clusters via differential
+Seurat can help you find markers that define clusters via differential
 expression.
 
 - FindMarkers() by default it identifies positive and negative markers
