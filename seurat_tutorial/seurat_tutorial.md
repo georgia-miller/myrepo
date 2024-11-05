@@ -347,7 +347,7 @@ DimPlot(pbmc, reduction = "pca") + NoLegend()
 ![](seurat_tutorial_files/figure-gfm/unnamed-chunk-14-2.png)<!-- -->
 
 DimHeatMap() allows easy exploration of primary sources of heterogeneity
-ub a dataset, can be useful for deciding which PCs to include for
+in a dataset, can be useful for deciding which PCs to include for
 downstream analyses. Cells and features are ordered according to PCA
 scores. Setting cells to a number plots the ‘extreme’ cells on both ends
 of the spectrum, which dramatically speeds plotting for large datasets.
